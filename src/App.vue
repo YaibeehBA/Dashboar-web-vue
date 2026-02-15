@@ -5,7 +5,7 @@
 </template>
 
 <script>
-import AvocadoDashboard from './components/AvocadoDashboard.vue'
+import AvocadoDashboard from './components/dashboard/AvocadoDashboard.vue'
 
 export default {
   name: 'App',
