@@ -17,21 +17,16 @@ export function useAvocadoData() {
       .map(item => ({
         ...item,
         fecha: new Date(item.fecha),
-        precio_promedio: parseFloat(String(item.precio_promedio).replace(',', '.')) || 0,
-        volumen_total: parseFloat(String(item.volumen_total).replace(',', '.')) || 0,
-        volumen_tipo_4046: parseFloat(String(item.volumen_tipo_4046).replace(',', '.')) || 0,
-        volumen_tipo_4225: parseFloat(String(item.volumen_tipo_4225).replace(',', '.')) || 0,
-        volumen_tipo_4770: parseFloat(String(item.volumen_tipo_4770).replace(',', '.')) || 0,
-        bolsas_pequenas: parseFloat(String(item.bolsas_pequenas).replace(',', '.')) || 0,
-        bolsas_totales: parseFloat(String(item.bolsas_totales).replace(',', '.')) || 0,
-        ingresos_totales: 0 // Se calculará después
+        precio_promedio: parseFloat(item.precio_promedio) || 0,
+        volumen_total: parseFloat(item.volumen_total) || 0,
+        volumen_tipo_4046: parseFloat(item.volumen_plu_4046) || 0,
+        volumen_tipo_4225: parseFloat(item.volumen_plu_4225) || 0,
+        volumen_tipo_4770: parseFloat(item.volumen_plu_4770) || 0,
+        bolsas_pequenas: parseFloat(item.bolsas_pequenas) || 0,
+        bolsas_totales: parseFloat(item.bolsas_totales) || 0,
+        // Si necesitas calcular ingresos totales, puedes hacerlo aquí
+        ingresos_totales: (parseFloat(item.precio_promedio) || 0) * (parseFloat(item.volumen_total) || 0)
       }));
-
-    // Calcular ingresos totales
-    datos.value = datos.value.map(d => ({
-      ...d,
-      ingresos_totales: d.precio_promedio * d.volumen_total
-    }));
 
     datosFiltrados.value = [...datos.value];
   };
@@ -42,7 +37,10 @@ export function useAvocadoData() {
       let cumple = true;
       if (filtros.value.region) cumple = cumple && d.region === filtros.value.region;
       if (filtros.value.tipo) cumple = cumple && d.tipo_producto === filtros.value.tipo;
-      if (filtros.value.anio) cumple = cumple && d.anio === parseInt(filtros.value.anio);
+      if (filtros.value.anio) {
+        const anio = new Date(d.fecha).getFullYear();
+        cumple = cumple && anio === parseInt(filtros.value.anio);
+      }
       return cumple;
     });
   };
@@ -55,7 +53,10 @@ export function useAvocadoData() {
   // Valores únicos para filtros
   const regiones = computed(() => [...new Set(datos.value.map(d => d.region))].sort());
   const tiposProducto = computed(() => [...new Set(datos.value.map(d => d.tipo_producto))].sort());
-  const anios = computed(() => [...new Set(datos.value.map(d => d.anio))].sort((a, b) => a - b));
+  const anios = computed(() => {
+    const años = [...new Set(datos.value.map(d => new Date(d.fecha).getFullYear()))];
+    return años.sort((a, b) => a - b);
+  });
 
   // Calcular KPIs
   const calcularKPIs = () => {
@@ -104,14 +105,14 @@ export function useAvocadoData() {
     const volumenAnterior = datosAnteriores.reduce((sum, d) => sum + d.volumen_total, 0);
     const volumenCambio = ((volumenReciente - volumenAnterior) / volumenAnterior) * 100;
 
-    // Ingresos totales
-    const ingresosTotales = datosActuales.reduce((sum, d) => sum + d.ingresos_totales, 0);
+    // Ingresos totales (calculados)
+    const ingresosTotales = datosActuales.reduce((sum, d) => sum + (d.precio_promedio * d.volumen_total), 0);
     
-    const ingresosRecientes = datosRecientes.reduce((sum, d) => sum + d.ingresos_totales, 0);
-    const ingresosAnteriores = datosAnteriores.reduce((sum, d) => sum + d.ingresos_totales, 0);
+    const ingresosRecientes = datosRecientes.reduce((sum, d) => sum + (d.precio_promedio * d.volumen_total), 0);
+    const ingresosAnteriores = datosAnteriores.reduce((sum, d) => sum + (d.precio_promedio * d.volumen_total), 0);
     const ingresosCambio = ((ingresosRecientes - ingresosAnteriores) / ingresosAnteriores) * 100;
 
-    // Rentabilidad
+    // Rentabilidad (precio por libra)
     const rentabilidad = ingresosTotales / volumenTotal;
     const rentabilidadReciente = ingresosRecientes / volumenReciente;
     const rentabilidadAnterior = ingresosAnteriores / volumenAnterior;
@@ -135,19 +136,19 @@ export function useAvocadoData() {
     const totalBolsasPequenas = datosActuales.reduce((sum, d) => sum + d.bolsas_pequenas, 0);
     const porcentajeBolsasPequenas = totalBolsas > 0 
       ? ((totalBolsasPequenas / totalBolsas) * 100).toFixed(1)
-      : 0;
+      : '0.0';
 
     const regionesUnicas = new Set(datosFiltrados.value.map(d => d.region));
 
     return {
       precioPromedio: precioPromedio.toFixed(2),
-      precioCambio: isNaN(precioCambio) ? 0 : parseFloat(precioCambio.toFixed(1)),
+      precioCambio: isNaN(precioCambio) || !isFinite(precioCambio) ? 0 : parseFloat(precioCambio.toFixed(1)),
       volumenTotal: (volumenTotal / 1000000).toFixed(2),
-      volumenCambio: isNaN(volumenCambio) ? 0 : parseFloat(volumenCambio.toFixed(1)),
+      volumenCambio: isNaN(volumenCambio) || !isFinite(volumenCambio) ? 0 : parseFloat(volumenCambio.toFixed(1)),
       ingresosTotales: (ingresosTotales / 1000000).toFixed(2),
-      ingresosCambio: isNaN(ingresosCambio) ? 0 : parseFloat(ingresosCambio.toFixed(1)),
+      ingresosCambio: isNaN(ingresosCambio) || !isFinite(ingresosCambio) ? 0 : parseFloat(ingresosCambio.toFixed(1)),
       rentabilidad: rentabilidad.toFixed(2),
-      rentabilidadCambio: isNaN(rentabilidadCambio) ? 0 : parseFloat(rentabilidadCambio.toFixed(1)),
+      rentabilidadCambio: isNaN(rentabilidadCambio) || !isFinite(rentabilidadCambio) ? 0 : parseFloat(rentabilidadCambio.toFixed(1)),
       productoDominante: productoDominante.codigo,
       productoDominanteVolumen: (productoDominante.volumen / 1000000).toFixed(2) + 'M lb',
       porcentajeBolsasPequenas: porcentajeBolsasPequenas,
@@ -172,7 +173,7 @@ export function useAvocadoData() {
       }
       porRegion[d.region].volumen += d.volumen_total;
       porRegion[d.region].precio += d.precio_promedio;
-      porRegion[d.region].ingresos += d.ingresos_totales;
+      porRegion[d.region].ingresos += d.precio_promedio * d.volumen_total;
       porRegion[d.region].registros++;
     });
 
@@ -215,7 +216,7 @@ export function useAvocadoData() {
     if (promediosPorMes.some(p => p.count > 0)) {
       const maxPrecioMes = promediosPorMes.reduce((max, m) => m.precio > max.precio ? m : max);
       const maxVolumenMes = promediosPorMes.reduce((max, m) => m.volumen > max.volumen ? m : max);
-      const minPrecioMes = promediosPorMes.reduce((min, m) => m.precio < min.precio ? m : max);
+      const minPrecioMes = promediosPorMes.reduce((min, m) => m.precio < min.precio ? m : maxPrecioMes);
 
       const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 

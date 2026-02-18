@@ -69,13 +69,21 @@ export default {
 
     const crearGraficoEvolucion = (ctx) => {
       const porMesAnio = {};
+      
       props.datos.forEach(d => {
-        const key = `${d.anio}-${String(d.fecha.getMonth() + 1).padStart(2, '0')}`;
+        // Extraer año y mes de la fecha
+        const fecha = new Date(d.fecha);
+        const anio = fecha.getFullYear();
+        const mes = fecha.getMonth() + 1;
+        const key = `${anio}-${String(mes).padStart(2, '0')}`;
+        
         if (!porMesAnio[key]) {
           porMesAnio[key] = { 
             precioSuma: 0, 
             volumenSuma: 0, 
-            count: 0 
+            count: 0,
+            anio,
+            mes
           };
         }
         porMesAnio[key].precioSuma += d.precio_promedio;
@@ -87,14 +95,22 @@ export default {
         .map(([fecha, data]) => ({
           fecha,
           precio: data.precioSuma / data.count,
-          volumen: data.volumenSuma / data.count / 1000000
+          volumen: data.volumenSuma / data.count / 1000000,
+          anio: data.anio,
+          mes: data.mes
         }))
         .sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+      // Formatear etiquetas para mostrar solo año-mes de manera más legible
+      const labels = datos.map(d => {
+        const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        return `${meses[d.mes - 1]} ${d.anio}`;
+      });
 
       return new Chart(ctx, {
         type: 'line',
         data: {
-          labels: datos.map(d => d.fecha),
+          labels: labels,
           datasets: [
             {
               label: 'Precio Promedio ($)',
@@ -146,6 +162,9 @@ export default {
               bodyColor: '#e0e0e0',
               padding: 12,
               callbacks: {
+                title: (tooltipItems) => {
+                  return tooltipItems[0].label;
+                },
                 label: (context) => {
                   if (context.dataset.label.includes('Precio')) {
                     return `${context.dataset.label}: $${context.parsed.y.toFixed(2)}`;
@@ -188,7 +207,11 @@ export default {
             },
             x: {
               grid: { display: false },
-              ticks: { maxRotation: 45, minRotation: 45 }
+              ticks: { 
+                maxRotation: 45, 
+                minRotation: 45,
+                maxTicksLimit: 20 // Limitar el número de etiquetas para no saturar
+              }
             }
           }
         }
@@ -203,7 +226,8 @@ export default {
       }));
       
       props.datos.forEach(d => {
-        const mes = d.fecha.getMonth();
+        const fecha = new Date(d.fecha);
+        const mes = fecha.getMonth();
         porMes[mes].precioSuma += d.precio_promedio;
         porMes[mes].volumenSuma += d.volumen_total;
         porMes[mes].count++;
@@ -328,7 +352,6 @@ export default {
   }
 };
 </script>
-
 <style scoped>
 .chart-card {
   background: white;
